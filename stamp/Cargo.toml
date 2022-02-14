@@ -1,0 +1,10 @@
+[package]
+name = "stamp"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+eframe = "0.16.0"
+stampcore = {path = "../stampcore"}
+tracing = "0.1.30"
+tracing-subscriber = "0.3.8"

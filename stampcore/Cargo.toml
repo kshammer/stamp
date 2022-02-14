@@ -1,0 +1,14 @@
+[package]
+name = "stampcore"
+version = "0.1.0"
+edition = "2018"
+
+
+[dependencies]
+reqwest = "0.11.9"
+thiserror = "1.0.30"
+tracing = "0.1.30"
+ureq = "2.4.0"
+url = "2.2.2"
+
+
