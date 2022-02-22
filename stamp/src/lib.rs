@@ -5,33 +5,29 @@ use eframe::{
     },
     epi::App,
 };
-use stampcore::OpenDotaAPI;
 use tracing::{event, Level};
-pub use stamp::{Stamp};
+pub use stamp::{Stamp, Player};
 
 impl App for Stamp{
 
-    fn setup(&mut self, ctx: &eframe::egui::CtxRef, _frame: &eframe::epi::Frame, _storage: Option<&dyn eframe::epi::Storage>){
-        fetch_player(&mut self.player_data)
+    fn setup(&mut self, _ctx: &eframe::egui::CtxRef, _frame: &eframe::epi::Frame, _storage: Option<&dyn eframe::epi::Storage>){
+        self.fetch_players("83615933");
+        self.fetch_players("130643254");
     }
 
     fn update(&mut self, ctx: &eframe::egui::CtxRef, _frame: &eframe::epi::Frame) {
         CentralPanel::default().show(ctx, |ui| {
             ui.heading("Dota");
-            self.render_player(ui);
+            for player in self.players.iter(){
+                player.render_player(ui);
+            }
         });
     }
 
 
     fn name(&self) -> &str {
-        "Stamp"
+        "Dota Stamp"
     }
+
 }
 
-fn fetch_player(player_data: &mut String){
-    event!(Level::INFO, "something has happened!");
-    if let Ok(response) = OpenDotaAPI::new().fetch(){
-        print!("{}", response.to_string());
-        *player_data = response;
-    }
-}
