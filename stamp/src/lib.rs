@@ -5,7 +5,6 @@ use eframe::{
     },
     epi::App,
 };
-use tracing::{event, Level};
 pub use stamp::{Stamp, Player};
 
 impl App for Stamp{
