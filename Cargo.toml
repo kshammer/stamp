@@ -1,6 +1,10 @@
-[workspace]
+[package]
+name = "stamp"
+edition = "2021" 
+version = "0.0.1" 
 
-members = [
-    "stampcore",
-    "stamp"
-]
+[dependencies]
+iced = { version = "0.3.0", features = ["image", "debug", "tokio"]  }
+opendota_client = {git = "https://github.com/kshammer/opendota_client" }
+tracing = "0.1.30"
+reqwest = "0.11.10"
