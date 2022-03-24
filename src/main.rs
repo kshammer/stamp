@@ -1,6 +1,6 @@
 use iced::{
     image, Application, Clipboard, Column, Command, Container, Element, Image, Length, Settings,
-    Text
+    Text,
 };
 use opendota_client::apis::{configuration, players_api::players_account_id_get};
 use opendota_client::models::player_response::PlayerResponse;
@@ -58,26 +58,43 @@ impl Application for Stamp {
         };
         Container::new(content).into()
     }
-
 }
 
 #[derive(Debug, Clone)]
 struct DotaPlayer {
     name: String,
     image: image::Handle,
-    image_url: String, 
+    image_url: String,
+    wins: String,
+    losses: String,
 }
 
 impl DotaPlayer {
+    pub fn new() -> Self {
+        Self {
+            name: String::from("Player"),
+            image: image::Handle::from_path("resources/default.png"), // replace with empty image? 
+            image_url: String::from("None"),
+            wins: String::from("-1"),
+            losses: String::from("-1"),
+        }
+    }
+
     fn view(&mut self) -> Column<Message> {
-        Column::new().push(Text::new(self.name.clone())).push(
-            Image::new(self.image.clone())
-                .width(Length::Units(100))
-                .height(Length::Units(100)),
-        )
+        Column::new()
+            .push(Text::new(self.name.clone()))
+            .push(
+                Image::new(self.image.clone())
+                    .width(Length::Units(100))
+                    .height(Length::Units(100)),
+            )
+            .push(Text::new(format!("Wins {}", self.wins.clone())))
+            .push(Text::new(format!("Loses {}", self.losses.clone())))
     }
 
     async fn search() -> Result<DotaPlayer, Error> {
+        let mut player = DotaPlayer::new();
+        // Split into individual methods for api calls 
         let response = match players_account_id_get(
             &configuration::Configuration::default(),
             83615933,
@@ -85,48 +102,40 @@ impl DotaPlayer {
         .await
         {
             Ok(x) => x,
-            Err(_) => {
-                PlayerResponse {
-                    tracked_until: None,
-                    solo_competitive_rank: None,
-                    competitive_rank: None,
-                    rank_tier: None,
-                    leaderboard_rank: None,
-                    mmr_estimate: None,
-                    profile: None,
-                }
-            }
-        };
-        let profile = response.profile.unwrap();
-        let profile_name = *profile;
-        let mut player = DotaPlayer {
-            name: match profile_name.personaname {
-                Some(x) => x,
-                None => "No name".to_string(),
+            Err(_) => PlayerResponse {
+                tracked_until: None,
+                solo_competitive_rank: None,
+                competitive_rank: None,
+                rank_tier: None,
+                leaderboard_rank: None,
+                mmr_estimate: None,
+                profile: None,
             },
-            image: image::Handle::from_path("resources/default.png"),
+        };
+        let profile = response.profile.unwrap(); // this will panic on private accounts 
+        let profile_name = *profile;
+        player.name = match profile_name.personaname {
+            Some(x) => x,
+            None => "No name".to_string(),
+        };
+        player.image_url = match profile_name.avatarfull {
+            Some(x) => x,
+            None => "No url".to_string(),
+        };
 
-            image_url: match profile_name.avatarfull {
-                Some(x) => x, 
-                None => "No url".to_string()
-            }
-            
-        };
-        player.image = match Self::fetch_player_image(player.image_url.clone()).await{
+        player.image = match Self::fetch_player_image(player.image_url.clone()).await {
             Ok(x) => x,
-            Err(_) => image::Handle::from_path("resources/default.png")
+            Err(_) => image::Handle::from_path("resources/default.png"),
         };
+
         Ok(player)
     }
 
-    async fn fetch_player_image(url: String) -> Result<image::Handle, reqwest::Error>{
+    async fn fetch_player_image(url: String) -> Result<image::Handle, reqwest::Error> {
         let bytes = reqwest::get(&url).await?.bytes().await?;
         Ok(image::Handle::from_memory(bytes.as_ref().to_vec()))
-
     }
-
 }
-
 
 #[derive(Debug, Clone)]
 enum Error {
