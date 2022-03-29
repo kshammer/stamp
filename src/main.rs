@@ -1,9 +1,9 @@
 use iced::{
     image, Application, Clipboard, Column, Command, Container, Element, Image, Length, Settings,
-    Text,
+    Text, Row,
 };
-use opendota_client::apis::{configuration, players_api::players_account_id_get};
-use opendota_client::models::player_response::PlayerResponse;
+use opendota_client::apis::{configuration, players_api::players_account_id_get, players_api::players_account_id_wl_get};
+use opendota_client::models::{player_response::PlayerResponse, PlayerWinLossResponse};
 use reqwest;
 
 pub fn main() -> iced::Result {
@@ -13,12 +13,12 @@ pub fn main() -> iced::Result {
 #[derive(Debug)]
 enum Stamp {
     Loading,
-    Loaded { player: DotaPlayer },
+    Loaded { dota_match: DotaMatch },
 }
 
 #[derive(Debug, Clone)]
 enum Message {
-    DotaPlayerFound(Result<DotaPlayer, Error>),
+    DotaMatchFound(Result<DotaMatch, Error>),
 }
 
 impl Application for Stamp {
@@ -29,7 +29,7 @@ impl Application for Stamp {
     fn new(_flags: ()) -> (Stamp, Command<Self::Message>) {
         (
             Stamp::Loading,
-            Command::perform(DotaPlayer::search(), Message::DotaPlayerFound),
+            Command::perform(DotaMatch::create_players(vec![83615933, 68167571]), Message::DotaMatchFound),
         )
     }
 
@@ -43,22 +43,52 @@ impl Application for Stamp {
         _clipboard: &mut Clipboard,
     ) -> Command<Self::Message> {
         match message {
-            Message::DotaPlayerFound(Ok(dotaplayer)) => {
-                *self = Stamp::Loaded { player: dotaplayer };
+            Message::DotaMatchFound(Ok(dota_match)) => {
+                *self = Stamp::Loaded { dota_match: dota_match };
                 Command::none()
             }
-            Message::DotaPlayerFound(Err(_error)) => Command::none(),
+            Message::DotaMatchFound(Err(_error)) => Command::none(),
         }
     }
 
     fn view(&mut self) -> Element<Self::Message> {
         let content = match self {
             Stamp::Loading => Column::new().push(Text::new("Searching for Dota Players")),
-            Stamp::Loaded { player } => Column::new().push(player.view()),
+            Stamp::Loaded { dota_match } => Column::new().push(dota_match.view()),
         };
         Container::new(content).into()
     }
 }
+
+#[derive(Debug, Clone)]
+struct DotaMatch {
+    players: Vec<DotaPlayer>
+}
+
+impl DotaMatch {
+    pub fn new() -> Self {
+        Self {
+            players: vec![]
+        }
+    }
+
+    async fn create_players(ids: Vec<i32>) -> Result<DotaMatch, Error>{
+        let mut dota_match = DotaMatch::new();
+        for id in ids.iter() {
+            dota_match.players.push(DotaPlayer::fetch_player_info(*id).await)
+        }
+        Ok(dota_match)
+    }
+
+    fn view(&mut self) -> Element<Message>{
+        let mut elements = Vec::<Element<Message>>::new();
+        for player in self.players.clone(){
+            elements.push(DotaPlayer::view(player));
+        }
+        Row::with_children(elements).into()
+    }
+}
+
 
 #[derive(Debug, Clone)]
 struct DotaPlayer {
@@ -80,24 +110,11 @@ impl DotaPlayer {
         }
     }
 
-    fn view(&mut self) -> Column<Message> {
-        Column::new()
-            .push(Text::new(self.name.clone()))
-            .push(
-                Image::new(self.image.clone())
-                    .width(Length::Units(100))
-                    .height(Length::Units(100)),
-            )
-            .push(Text::new(format!("Wins {}", self.wins.clone())))
-            .push(Text::new(format!("Loses {}", self.losses.clone())))
-    }
-
-    async fn search() -> Result<DotaPlayer, Error> {
+    pub async fn fetch_player_info(id: i32) -> DotaPlayer{
         let mut player = DotaPlayer::new();
-        // Split into individual methods for api calls 
         let response = match players_account_id_get(
             &configuration::Configuration::default(),
-            83615933,
+            id,
         )
         .await
         {
@@ -128,7 +145,41 @@ impl DotaPlayer {
             Err(_) => image::Handle::from_path("resources/default.png"),
         };
 
-        Ok(player)
+        let response =  match players_account_id_wl_get(
+            &configuration::Configuration::default(),
+            id,
+            Some(20),None,None,None,None,None,None,None,None,None,None,None,None,None,None,None,None,None
+        )
+        .await
+        {
+            Ok(x) => x,
+            Err(_) => PlayerWinLossResponse {
+                win: None,
+                lose: None
+            },
+        };
+        player.wins = match response.win{
+            Some(x) => x.to_string(),
+            None => "-1".to_string()
+        };
+        player.losses = match response.lose{
+            Some(x) => x.to_string(),
+            None => "-1".to_string()
+        };
+
+        player
+    }
+
+    fn view(player: DotaPlayer) -> Element<'static, Message> {
+        Column::new()
+            .push(Text::new(&player.name))
+            .push(
+                Image::new(player.image.clone())
+                    .width(Length::Units(100))
+                    .height(Length::Units(100)),
+            )
+            .push(Text::new(format!("Wins {}", &player.wins)))
+            .push(Text::new(format!("Loses {}", &player.losses))).into()
     }
 
     async fn fetch_player_image(url: String) -> Result<image::Handle, reqwest::Error> {
