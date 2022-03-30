@@ -8,3 +8,7 @@ iced = { version = "0.3.0", features = ["image", "debug", "tokio"]  }
 opendota_client = {git = "https://github.com/kshammer/opendota_client" }
 tracing = "0.1.30"
 reqwest = "0.11.10"
+regex = "1.5.5"
+lazy_static = "1.4.0"
+itertools = "0.10.3"
+oneshot = "0.1.3"
