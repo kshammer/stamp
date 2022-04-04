@@ -1,13 +1,15 @@
 #![feature(windows_by_handle)]
 use iced::{
-    image, Application, Clipboard, Column, Command, Container, Element, Image, Length, Settings,
-    Text, Row,
+    image, Application, Clipboard, Column, Command, Container, Element, Image, Length, Row,
+    Settings, Text,
 };
-use opendota_client::apis::{configuration, players_api::players_account_id_get, players_api::players_account_id_wl_get};
+use opendota_client::apis::{
+    configuration, players_api::players_account_id_get, players_api::players_account_id_wl_get,
+};
 use opendota_client::models::PlayerResponseProfile;
 use opendota_client::models::{player_response::PlayerResponse, PlayerWinLossResponse};
 use reqwest;
-use std::sync::mpsc::{Sender, Receiver, channel};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
 use itertools::Itertools;
@@ -52,7 +54,9 @@ impl Application for Stamp {
     ) -> Command<Self::Message> {
         match message {
             Message::DotaMatchFound(Ok(dota_match)) => {
-                *self = Stamp::Loaded { dota_match: dota_match };
+                *self = Stamp::Loaded {
+                    dota_match: dota_match,
+                };
                 Command::none()
             }
             Message::DotaMatchFound(Err(_error)) => Command::none(),
@@ -68,43 +72,41 @@ impl Application for Stamp {
     }
 }
 
-async fn watch() -> Result<DotaMatch, Error>{
-    let mut log_watcher = LogWatcher::register("log.txt").unwrap(); 
+async fn watch() -> Result<DotaMatch, Error> {
+    let mut log_watcher = LogWatcher::register("log.txt").unwrap();
     let player_ids = log_watcher.watch().await;
     let dota_match = DotaMatch::create_players(player_ids).await;
     Ok(dota_match)
 }
 
-
 #[derive(Debug, Clone)]
 struct DotaMatch {
-    players: Vec<DotaPlayer>
+    players: Vec<DotaPlayer>,
 }
 
 impl DotaMatch {
     pub fn new() -> Self {
-        Self {
-            players: vec![]
-        }
+        Self { players: vec![] }
     }
 
-    async fn create_players(ids: Vec<i32>) -> DotaMatch{
+    async fn create_players(ids: Vec<i32>) -> DotaMatch {
         let mut dota_match = DotaMatch::new();
         for id in ids.iter() {
-            dota_match.players.push(DotaPlayer::fetch_player_info(*id).await)
+            dota_match
+                .players
+                .push(DotaPlayer::fetch_player_info(*id).await)
         }
         dota_match
     }
 
-    fn view(&mut self) -> Element<Message>{
+    fn view(&mut self) -> Element<Message> {
         let mut elements = Vec::<Element<Message>>::new();
-        for player in self.players.clone(){
+        for player in self.players.clone() {
             elements.push(DotaPlayer::view(player));
         }
         Row::with_children(elements).into()
     }
 }
-
 
 #[derive(Debug, Clone)]
 struct DotaPlayer {
@@ -119,47 +121,43 @@ impl DotaPlayer {
     pub fn new() -> Self {
         Self {
             name: String::from("Player"),
-            image: image::Handle::from_path("resources/default.png"), // replace with empty image? 
+            image: image::Handle::from_path("resources/default.png"), // replace with empty image?
             image_url: String::from("None"),
             wins: String::from("-1"),
             losses: String::from("-1"),
         }
     }
 
-    pub async fn fetch_player_info(id: i32) -> DotaPlayer{
+    pub async fn fetch_player_info(id: i32) -> DotaPlayer {
         let mut player = DotaPlayer::new();
-        let response = match players_account_id_get(
-            &configuration::Configuration::default(),
-            id,
-        )
-        .await
-        {
-            Ok(x) => x,
-            Err(_) => PlayerResponse {
-                tracked_until: None,
-                solo_competitive_rank: None,
-                competitive_rank: None,
-                rank_tier: None,
-                leaderboard_rank: None,
-                mmr_estimate: None,
-                profile: None,
-            },
-        };
-        let profile = match  response.profile {
-            Some(x) => x, 
+        let response =
+            match players_account_id_get(&configuration::Configuration::default(), id).await {
+                Ok(x) => x,
+                Err(_) => PlayerResponse {
+                    tracked_until: None,
+                    solo_competitive_rank: None,
+                    competitive_rank: None,
+                    rank_tier: None,
+                    leaderboard_rank: None,
+                    mmr_estimate: None,
+                    profile: None,
+                },
+            };
+        let profile = match response.profile {
+            Some(x) => x,
             None => {
-                let private_profile = PlayerResponseProfile::new();
+                let private_profile = PlayerResponseProfile::new(); 
                 Box::new(private_profile)
             }
         };
         let profile_name = *profile;
         player.name = match profile_name.personaname {
             Some(x) => x,
-            None => "No name".to_string(),
+            None => "Private Profile".to_string(),
         };
         player.image_url = match profile_name.avatarfull {
             Some(x) => x,
-            None => "No url".to_string(),
+            None => "".to_string(),
         };
 
         player.image = match Self::fetch_player_image(player.image_url.clone()).await {
@@ -167,30 +165,56 @@ impl DotaPlayer {
             Err(_) => image::Handle::from_path("resources/default.png"),
         };
 
-        let response =  match players_account_id_wl_get(
+        let response = match players_account_id_wl_get(
             &configuration::Configuration::default(),
             id,
-            Some(20),None,None,None,None,None,None,None,None,None,None,None,None,None,None,None,None,None
+            Some(20),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
         )
         .await
         {
             Ok(x) => x,
             Err(_) => PlayerWinLossResponse {
                 win: None,
-                lose: None
+                lose: None,
             },
         };
-        player.wins = match response.win{
+        player.wins = match response.win {
             Some(x) => x.to_string(),
-            None => "-1".to_string()
+            None => "".to_string(),
         };
-        player.losses = match response.lose{
+        player.losses = match response.lose {
             Some(x) => x.to_string(),
-            None => "-1".to_string()
+            None => "".to_string(),
         };
 
         player
     }
+
+    async fn fetch_player_image(url: String) -> Result<image::Handle, reqwest::Error> {
+        let bytes = reqwest::get(&url).await?.bytes().await?;
+        Ok(image::Handle::from_memory(bytes.as_ref().to_vec()))
+    }
+
+    // async fn fetch_player_winrate(id: i32) -> Result< , Error>{
+
+    // }
 
     fn view(player: DotaPlayer) -> Element<'static, Message> {
         Column::new()
@@ -201,13 +225,10 @@ impl DotaPlayer {
                     .height(Length::Units(100)),
             )
             .push(Text::new(format!("Wins {}", &player.wins)))
-            .push(Text::new(format!("Loses {}", &player.losses))).into()
+            .push(Text::new(format!("Loses {}", &player.losses)))
+            .into()
     }
 
-    async fn fetch_player_image(url: String) -> Result<image::Handle, reqwest::Error> {
-        let bytes = reqwest::get(&url).await?.bytes().await?;
-        Ok(image::Handle::from_memory(bytes.as_ref().to_vec()))
-    }
 }
 
 #[derive(Debug, Clone)]
