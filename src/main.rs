@@ -4,12 +4,12 @@ use iced::{
     Text, Row,
 };
 use opendota_client::apis::{configuration, players_api::players_account_id_get, players_api::players_account_id_wl_get};
+use opendota_client::models::PlayerResponseProfile;
 use opendota_client::models::{player_response::PlayerResponse, PlayerWinLossResponse};
 use reqwest;
 use std::sync::mpsc::{Sender, Receiver, channel};
 use std::thread;
-use regex::Regex;
-use lazy_static::lazy_static;
+
 use itertools::Itertools;
 mod log_watch;
 use log_watch::{LogWatcher, LogWatcherAction};
@@ -69,44 +69,12 @@ impl Application for Stamp {
 }
 
 async fn watch() -> Result<DotaMatch, Error>{
-    // let (sender, receiver): (Sender<String>, Receiver<String>) = channel();
-    // let t = thread::spawn(move || {
-    //     let mut log_watcher = LogWatcher::register("log.txt").unwrap(); 
-    //     log_watcher.watch(&sender);
-    // });
-    // let log_string = receiver.recv().unwrap();
-    // t.join().unwrap();
-    // print!("{}", log_string);
-    // if dota_match_log_message(&log_string) {
-    //     let ids = fetch_player_ids(&log_string);
-    //     let dota_match = DotaMatch::create_players(ids).await;
-    //     return Ok(dota_match);
-    // }
-    let dota_match = DotaMatch::create_players(vec![83615933,68167571]).await;
+    let mut log_watcher = LogWatcher::register("log.txt").unwrap(); 
+    let player_ids = log_watcher.watch().await;
+    let dota_match = DotaMatch::create_players(player_ids).await;
     Ok(dota_match)
 }
 
-
-
-fn fetch_player_ids(text: &str) -> Vec<i32> {
-    lazy_static! {
-        static ref RE: Regex = Regex::new(r"\[U:1:\d{8,9}\]").unwrap(); // rust can't use positive or negative lookaheads 
-    }
-    // matches [U:1:370898177]
-    let full_ids: Vec<String> = RE.find_iter(text)
-        .filter_map(|matches| matches.as_str().parse().ok())
-        .collect();
-
-    // trims the [U:1:]
-    let string_ids = full_ids.iter().unique().map(|x| &x[5..x.len()-1]).map(|x| x.to_string()).collect::<Vec<_>>();
-
-    string_ids.iter().map(|id| id.parse::<i32>().unwrap()).collect()
-} 
-
-fn dota_match_log_message(text: &str) -> bool {
-    let re = Regex::new(r"Lobby").unwrap();
-    re.is_match(text)
-}
 
 #[derive(Debug, Clone)]
 struct DotaMatch {
@@ -177,7 +145,13 @@ impl DotaPlayer {
                 profile: None,
             },
         };
-        let profile = response.profile.unwrap(); // this will panic on private accounts 
+        let profile = match  response.profile {
+            Some(x) => x, 
+            None => {
+                let private_profile = PlayerResponseProfile::new();
+                Box::new(private_profile)
+            }
+        };
         let profile_name = *profile;
         player.name = match profile_name.personaname {
             Some(x) => x,
