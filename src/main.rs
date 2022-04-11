@@ -21,14 +21,14 @@ pub fn main() -> iced::Result {
 }
 
 #[derive(Debug)]
-enum Stamp {
-    Loading,
-    Loaded { dota_match: DotaMatch },
+struct Stamp {
+    cool: String
 }
 
 #[derive(Debug, Clone)]
 enum Message {
-    DotaMatchFound(Result<DotaMatch, Error>),
+    LookingForMatch,
+    DotaMatchFound(Result<Vec<i32>, Error>),
 }
 
 impl Application for Stamp {
@@ -36,10 +36,12 @@ impl Application for Stamp {
     type Message = Message;
     type Flags = ();
 
-    fn new(_flags: ()) -> (Stamp, Command<Self::Message>) {
+    fn new(_flags: ()) -> (Self, Command<Self::Message>) {
         (
-            Stamp::Loading,
-            Command::perform(watch(), Message::DotaMatchFound),
+            Self{
+                cool: "Hi".to_string()
+            },
+            Command::none()
         )
     }
 
@@ -53,8 +55,8 @@ impl Application for Stamp {
         _clipboard: &mut Clipboard,
     ) -> Command<Self::Message> {
         match message {
-            Message::DotaMatchFound(Ok(dota_match)) => {
-                *self = Stamp::Loaded {
+            Message::LookingForMatch => {
+                *self = Message::Loaded {
                     dota_match: dota_match,
                 };
                 Command::none()
@@ -67,16 +69,17 @@ impl Application for Stamp {
         let content = match self {
             Stamp::Loading => Column::new().push(Text::new("Searching for Dota Players")),
             Stamp::Loaded { dota_match } => Column::new().push(dota_match.view()),
+            Stamp::PlayerLoaded => Column::new().push(Text::new("Player loaded"))
         };
         Container::new(content).into()
     }
 }
 
-async fn watch() -> Result<DotaMatch, Error> {
-    let mut log_watcher = LogWatcher::register("log.txt").unwrap();
-    let player_ids = log_watcher.watch().await;
-    let dota_match = DotaMatch::create_players(player_ids).await;
-    Ok(dota_match)
+async fn watch() -> Result<Vec<i32>, Error> {
+    // let mut log_watcher = LogWatcher::register("log.txt").unwrap();
+    // let player_ids = log_watcher.watch().await;
+    let player_ids = vec![83615933, 244676219];
+    Ok(player_ids)
 }
 
 #[derive(Debug, Clone)]
@@ -99,12 +102,20 @@ impl DotaMatch {
         dota_match
     }
 
+    // fn view(&mut self) -> Element<Message> {
+    //     let mut elements = Vec::<Element<Message>>::new();
+    //     for player in self.players.clone() {
+    //         elements.push(DotaPlayer::view(player));
+    //     }
+    //     Row::with_children(elements).into()
+    // }
+
     fn view(&mut self) -> Element<Message> {
         let mut elements = Vec::<Element<Message>>::new();
-        for player in self.players.clone() {
-            elements.push(DotaPlayer::view(player));
-        }
-        Row::with_children(elements).into()
+            for player in self.players.clone() {
+                elements.push(Text::new(player.name.to_string()).into());
+            }
+            Row::with_children(elements).into()
     }
 }
 
