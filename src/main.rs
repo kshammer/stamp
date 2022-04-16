@@ -80,38 +80,38 @@ impl Application for Stamp {
     }
 
     fn view(&mut self) -> Element<Self::Message> {
-        let content = if self.dota_match.players.is_empty() {
-            let col = Column::new();
-            col.push(Text::new("Looking for matches"))
-        } else {
-            let column: Column<'static, Message> = Column::new();
-            let (top_row, bot_row) = match self.dota_match.players.len() {
-                0..=4 => {
-                    let top_row = self
-                        .dota_match
-                        .players
-                        .clone()
-                        .iter()
-                        .fold(Row::new(), |row, player| row.push(player.view()));
-                    let bot_row = Row::new();
-                    (top_row, bot_row)
-                }
-                5..=10 => {
-                    let top_row = self.dota_match.players.clone()[0..5]
-                        .iter()
-                        .fold(Row::new(), |row, player| row.push(player.view()));
-                    let bot_row = self.dota_match.players.clone()[5..]
-                        .iter()
-                        .fold(Row::new(), |row, player| row.push(player.view()));
-                    (top_row, bot_row)
-                }
+        let row_spacing = 10; 
+        let col_spacing = 10;
+        let (top_row, bot_row) = match self.dota_match.players.len() {
+            0 => {
+                let top_row = Row::new().push(Text::new("Looking for matches"));
+                (top_row, Row::new())
+            }
+            1..=4 => {
+                let top_row = self
+                    .dota_match
+                    .players
+                    .clone()
+                    .iter()
+                    .fold(Row::new(), |row, player| row.push(player.view())).spacing(row_spacing);
+                let bot_row = Row::new();
+                (top_row, bot_row)
+            }
+            5..=10 => {
+                let top_row = self.dota_match.players.clone()[0..5]
+                    .iter()
+                    .fold(Row::new(), |row, player| row.push(player.view())).spacing(row_spacing);
+                let bot_row = self.dota_match.players.clone()[5..]
+                    .iter()
+                    .fold(Row::new(), |row, player| row.push(player.view())).spacing(row_spacing);
+                (top_row, bot_row)
+            }
 
-                _ => (Row::new(), Row::new()),
-            };
-            column.push(top_row).push(bot_row)
+            _ => (Row::new(), Row::new()),
         };
+        let column: Column<'static, Message> = Column::new().push(top_row).push(bot_row).spacing(col_spacing);
 
-        Container::new(content)
+        Container::new(column)
             .width(Length::Fill)
             .height(Length::Fill)
             .into()
@@ -120,9 +120,12 @@ impl Application for Stamp {
 
 fn watch() -> impl Future<Output = Vec<i32>> {
     async {
-        let mut log_watcher = LogWatcher::register("log.txt").unwrap();
-        let player_ids = log_watcher.watch().await;
-        // let player_ids = vec![83615933, 207041414, 218061707, 346964866];
+        // let mut log_watcher = LogWatcher::register("log.txt").unwrap();
+        // let player_ids = log_watcher.watch().await;
+        let player_ids = vec![
+            416098293, 926498844, 193296043, 207041414, 218061707, 46333111, 83615933, 346964866,
+            244676219, 395739513,
+        ];
         player_ids
     }
 }
