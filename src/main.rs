@@ -1,5 +1,4 @@
 #![feature(windows_by_handle)]
-use iced::futures::stream::Collect;
 use iced::{
     image, Application, Clipboard, Column, Command, Container, Element, Image, Length, Row,
     Settings, Text,
@@ -14,6 +13,7 @@ use reqwest;
 use std::future::Future;
 use tracing::info;
 use tracing_subscriber;
+mod style;
 
 mod log_watch;
 pub fn main() -> iced::Result {
@@ -114,6 +114,7 @@ impl Application for Stamp {
         Container::new(column)
             .width(Length::Fill)
             .height(Length::Fill)
+            .style(style::Container)
             .into()
     }
 }
@@ -251,7 +252,7 @@ impl DotaPlayer {
     }
 
     pub fn view(&self) -> Element<'static, Message> {
-        Column::new()
+        let col: Column<'static, Message> = Column::new()
             .push(Text::new(self.name.clone()))
             .push(
                 Image::new(self.image.clone())
@@ -260,7 +261,8 @@ impl DotaPlayer {
             )
             .push(Text::new(format!("Wins {}", self.wins)))
             .push(Text::new(format!("Loses {}", self.losses)))
-            .into()
+            .into();
+        Container::new(col).style(style::player_card).into()
     }
 }
 
