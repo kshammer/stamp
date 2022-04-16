@@ -1,6 +1,8 @@
 #![feature(windows_by_handle)]
+use iced::futures::stream::Collect;
 use iced::{
-    image, Application, Clipboard, Column, Command, Container, Element, Image, Length, Settings, Text, Row
+    image, Application, Clipboard, Column, Command, Container, Element, Image, Length, Row,
+    Settings, Text,
 };
 use log_watch::LogWatcher;
 use opendota_client::apis::{
@@ -10,7 +12,7 @@ use opendota_client::models::PlayerResponseProfile;
 use opendota_client::models::{player_response::PlayerResponse, PlayerWinLossResponse};
 use reqwest;
 use std::future::Future;
-use tracing::{info};
+use tracing::info;
 use tracing_subscriber;
 
 mod log_watch;
@@ -41,7 +43,7 @@ impl Application for Stamp {
 
     fn new(_flags: ()) -> (Self, Command<Self::Message>) {
         (
-            Self::default(), 
+            Self::default(),
             Command::perform(watch(), |player_ids| Message::MatchFound(player_ids)),
         )
     }
@@ -56,7 +58,7 @@ impl Application for Stamp {
         _clipboard: &mut Clipboard,
     ) -> Command<Self::Message> {
         match message {
-            Message::LookingForMatch => {Command::none()}
+            Message::LookingForMatch => Command::none(),
             Message::MatchFound(player_ids) => {
                 info!("Found Players");
                 let commands = player_ids
@@ -75,25 +77,44 @@ impl Application for Stamp {
                 Command::none()
             }
         }
-
     }
 
     fn view(&mut self) -> Element<Self::Message> {
-
         let content = if self.dota_match.players.is_empty() {
-            let row = Row::new();
-            row.push(Text::new("Looking for matches"))
-            
+            let col = Column::new();
+            col.push(Text::new("Looking for matches"))
         } else {
-            let mut elements = Vec::<Element<Message>>::new();
-            for player in self.dota_match.players.clone(){
-                elements.push(DotaPlayer::view(player));
-            }
-            Row::with_children(elements).into()
-        };
-        
+            let column: Column<'static, Message> = Column::new();
+            let (top_row, bot_row) = match self.dota_match.players.len() {
+                0..=4 => {
+                    let top_row = self
+                        .dota_match
+                        .players
+                        .clone()
+                        .iter()
+                        .fold(Row::new(), |row, player| row.push(player.view()));
+                    let bot_row = Row::new();
+                    (top_row, bot_row)
+                }
+                5..=10 => {
+                    let top_row = self.dota_match.players.clone()[0..5]
+                        .iter()
+                        .fold(Row::new(), |row, player| row.push(player.view()));
+                    let bot_row = self.dota_match.players.clone()[5..]
+                        .iter()
+                        .fold(Row::new(), |row, player| row.push(player.view()));
+                    (top_row, bot_row)
+                }
 
-        Container::new(content).width(Length::Fill).height(Length::Fill).into()
+                _ => (Row::new(), Row::new()),
+            };
+            column.push(top_row).push(bot_row)
+        };
+
+        Container::new(content)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into()
     }
 }
 
@@ -119,9 +140,7 @@ impl Default for DotaMatch {
 
 impl DotaMatch {
     pub fn new() -> Self {
-        Self {
-            players: vec![],
-        }
+        Self { players: vec![] }
     }
 }
 
@@ -140,24 +159,17 @@ impl DotaPlayer {
         Ok(image::Handle::from_memory(bytes.as_ref().to_vec()))
     }
 
-
     pub fn fetch_player_info(id: i32) -> impl Future<Output = DotaPlayer> {
         info!("Fetching Player");
-        async move{
+        async move {
             info!("In async");
             let mut player = DotaPlayer::new();
+            // if it errors return a empty profile to stop wasting api calls
             let response =
-                match players_account_id_get(&configuration::Configuration::default(),id).await {
+                match players_account_id_get(&configuration::Configuration::default(), id).await {
                     Ok(x) => x,
-                    Err(_) => PlayerResponse {
-                        tracked_until: None,
-                        solo_competitive_rank: None,
-                        competitive_rank: None,
-                        rank_tier: None,
-                        leaderboard_rank: None,
-                        mmr_estimate: None,
-                        profile: None,
-                    },
+                    // If Player Response is empty or error'd return a default player
+                    Err(_) => return player,
                 };
             let profile = match response.profile {
                 Some(x) => x,
@@ -224,21 +236,22 @@ impl DotaPlayer {
         }
     }
 
+    // Change to default
     pub fn new() -> Self {
         Self {
-            name: String::from("Player"),
+            name: String::from("Private Player"),
             image: image::Handle::from_path("resources/default.png"), // replace with empty image?
             image_url: String::from("None"),
-            wins: String::from("-1"),
-            losses: String::from("-1"),
+            wins: String::from("0"),
+            losses: String::from("0"),
         }
     }
 
-    pub fn view(self) -> Element<'static, Message> {
+    pub fn view(&self) -> Element<'static, Message> {
         Column::new()
-            .push(Text::new(self.name))
+            .push(Text::new(self.name.clone()))
             .push(
-                Image::new(self.image)
+                Image::new(self.image.clone())
                     .width(Length::Units(100))
                     .height(Length::Units(100)),
             )

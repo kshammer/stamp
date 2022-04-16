@@ -5,13 +5,9 @@ use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 use std::io::BufReader;
-use std::io::ErrorKind;
 use std::io::SeekFrom;
 use std::os::windows::fs::MetadataExt;
 use std::path::Path;
-use std::sync::mpsc::Sender;
-use std::thread::sleep;
-use std::time::Duration;
 
 pub enum LogWatcherAction {
     None,
