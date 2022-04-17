@@ -1,4 +1,4 @@
-use iced::{container, Background, Color, Column};
+use iced::{container, Background, Color};
 
 
 pub struct Container; 
